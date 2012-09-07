@@ -26,6 +26,8 @@ Usage:
     $program insert [--no-echo,-n | --multiline,-m] pass-name
         Insert new password. Optionally, the console can be enabled to not
         echo the password back. Or, optionally, it may be multiline.
+    $program edit
+        Add or edit password with $EDITOR (default vi).
     $program generate [--no-symbols,-n] [--clip,-c] pass-name pass-length
         Generate a new password of pass-length with optionally no symbols.
         Optionally put it on the clipboard and clear board after 45 seconds.
@@ -44,7 +46,7 @@ _EOF
 }
 isCommand() {
 	case "$1" in
-		init|ls|list|show|insert|generate|remove|rm|delete|push|pull|git|help) return 0 ;;
+		init|ls|list|show|insert|edit|generate|remove|rm|delete|push|pull|git|help) return 0 ;;
 		*) return 1 ;;
 	esac
 }
@@ -186,6 +188,29 @@ case "$command" in
 			git commit -m "Added given password for $path to store."
 		fi
 		;;
+	edit)
+		[ "$1" ] || {
+			echo "need a password to edit"
+			exit
+		}
+		path="$1"
+		mkdir -p -v "$PREFIX/$(dirname "$path")"
+		passfile="$PREFIX/$path.gpg"
+		fl=$(mktemp)
+		if [ -f "$passfile" ];then
+			gpg --decrypt "$passfile" > "$fl"
+			log="Edited"
+		else
+			log="Added"
+		fi
+		"${EDITOR:-vi}" "$fl"
+		gpg -e -r "$ID" > "$passfile" <"$fl"
+		rm "$fl"
+		[ -d $GIT ] && {
+			git add "$passfile"
+			git commit -m "$log given password for $path to store."
+		}
+	;;
 	generate)
 		clip=0
 		symbols="-y"
